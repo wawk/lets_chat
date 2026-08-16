@@ -1,0 +1,33 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Virtual Environment ---
+venv/
+.env/
+.venv/
+
+# --- Environment & Secrets ---
+*.env
+.env.*
+
+# --- OS Junk ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+
+# --- Local Data / Cache ---
+.cache/
+*.sqlite3
+
+# --- Project-specific ---
+# Add anything your project generates automatically
+
