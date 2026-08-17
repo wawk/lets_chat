@@ -1,4 +1,6 @@
 # This file must be used with "source bin/activate" *from bash*
+export PYTHONPATH=/Users/stevem/projects/lets_chat
+
 # You cannot run it directly
 
 deactivate () {
