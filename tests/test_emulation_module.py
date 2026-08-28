@@ -1,4 +1,4 @@
-from core.agent import Agent
+from agents.agent import Agent
 from memory.memory_manager import MemoryManager
 
 class FakeLLM:

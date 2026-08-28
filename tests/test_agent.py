@@ -1,6 +1,6 @@
 from llm.llm_wrapper import LLM
 from unittest.mock import MagicMock
-from core.agent import Agent 
+from agents.agent import Agent 
 
 def test_agent_uses_llm_for_reply():
     # llm = LLM(provider="openai", model="gpt-4o-mini")

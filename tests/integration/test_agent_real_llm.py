@@ -4,7 +4,7 @@ load_dotenv()
 system_prompt = "You are a helpful friendly assistant."
 from memory.memory_manager import MemoryManager
 from llm.llm_wrapper import LLM
-from core.agent import Agent
+from agents.agent import Agent
 
 def test_agent_real_llm_integration():
     # Use a known path for the test

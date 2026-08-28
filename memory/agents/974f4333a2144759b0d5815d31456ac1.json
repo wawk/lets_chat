@@ -1,0 +1,11 @@
+{
+    "agent_id": "974f4333a2144759b0d5815d31456ac1",
+    "agent_name": null,
+    "user_name": null,
+    "personality": {},
+    "facts": {
+        "agent_name": "Bob",
+        "user_name": "Steve",
+        "favorite_color": "blue"
+    }
+}

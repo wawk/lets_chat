@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from llm.llm_wrapper import LLM
-from core.agent import Agent
+from agents.agent import Agent
 system_prompt = "You are a helpful friendly assistant."
 def test_agent_stores_assistant_messages_real():
     # Endure API Key is present

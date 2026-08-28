@@ -1,0 +1,9 @@
+{
+    "agent_id": "5924dcc14b5f48998b62104be88061e7",
+    "agent_name": "Bob",
+    "user_name": "Steve",
+    "personality": {},
+    "facts": {
+        "favorite_color": "blue"
+    }
+}
