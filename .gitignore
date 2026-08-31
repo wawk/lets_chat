@@ -11,9 +11,7 @@ venv/
 
 # --- Environment & Secrets ---
 *.env
-.env.*
-
-# --- OS Junk ---
+.env.Junk ---
 .DS_Store
 Thumbs.db
 
@@ -30,4 +28,11 @@ Thumbs.db
 
 # --- Project-specific ---
 # Add anything your project generates automatically
+# Agent memory files
+memory/*.json
+agents/*.json
+
+
+
+
 

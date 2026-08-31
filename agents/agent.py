@@ -7,9 +7,14 @@ class Agent:
         self.llm = llm
         self.history = []
         self.agent_id = agent_id
-        self.memory_manager = memory_manager or MemoryManagerV2()
-        self.memory = self.memory_manager.load()
         self.system_prompt = system_prompt
+        self.memory_manager = memory_manager
+        # Only load memory if a manager is provided
+        if  self.memory_manager is not None:
+            self.memory = self.memory_manager.load()
+        else:
+            self.memory = {}
+       
 
     def _prepare_messages(self, user_text):
         messages = []
