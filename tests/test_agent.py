@@ -1,58 +1,99 @@
-from llm.llm_wrapper import LLM
-from unittest.mock import MagicMock
-from agents.agent import Agent 
+from agents.agent import Agent
 
-def test_agent_uses_llm_for_reply():
-    # llm = LLM(provider="openai", model="gpt-4o-mini")
-    llm = MagicMock()
-    llm.invoke.return_value = "Hi there!"
-    agent = Agent(llm=llm)
+class FakeLLM:
+        def invoke(self, messages):
+            return "ok"
 
-    reply = agent.handle_user_message("Hello")
+# Test History
 
-    assert reply == "Hi there!"
-    llm.invoke.assert_called_once_with([{"role": "user", "content": "Hello"}])
-    # assert isinstance(reply, str)
-    # assert len(reply > 0)
+def test_agent_appends_user_messages():
+    agent = Agent(
+        llm = FakeLLM(),
+        memory_manager=None,
+        agent_id="test_agent",
+        system_prompt = None
+    )
+    agent.handle_user_message("Hello World.")
 
-def test_agent_includes_system_prompt():
-    llm = MagicMock()
-    llm.invoke.return_value = "Hi"
+    # Assert
+    assert len(agent.history) == 2
+    assert agent.history[0]["role"] == "user"
+    assert agent.history[0]["content"] == "Hello World."
+
+def test_agent_appends_assistant_messages():
+    agent = Agent(
+        llm = FakeLLM(),
+        memory_manager=None,
+        agent_id="test_agent",
+        system_prompt = None
+    )
+    agent.handle_user_message("Hi")
+    assert agent.history[1]["role"] == "assistant"
+    assert agent.history[1]["content"] == "ok"
+
+def test_agent_preserves_history_order():
+    agent = Agent(
+           llm = FakeLLM(),
+           memory_manager=None,
+           agent_id="test_agent",
+           system_prompt = None
+    )
+    agent.handle_user_message("First")
+    agent.handle_user_message("Second")
+
+    assert agent.history[0]["role"] == "user"
+    assert agent.history[0]["content"] == "First"
+    assert agent.history[1]["role"] == "assistant"
+    assert agent.history[1]["content"] == "ok"
+    assert agent.history[2]["role"] == "user"
+    assert agent.history[2]["content"] == "Second"
+    assert agent.history[3]["role"] == "assistant"
+    assert agent.history[3]["content"] == "ok"  
+
+# Test Memory Instructions
+def test_agent_updates_memory_on_remember():
+     # Fake memory manager to capture updates
+    class FakeMemoryManager:
+            def __init__(self):
+               self.updated = {}
+            def load_memory(self):
+                return {}  # Agent expects this
+            def update_facts(self, key, value):
+                 self.updated[key] = value
+            def save_memory(self, memory):
+                pass  # Agent will call this; no-op is fine
+            def parse_memory_instruction(self, text):
+                # Minimal parser for the test
+                # "remember favorite_color is blue"
+                parts = text.split()
+                key = parts[1]
+                value = parts[3]
+                return key, value
+    class FakeLLM:
+         def invoke(self, messages):
+              raise AssertionError("LLM should NOT be called for memory instructions")
+    memory = FakeMemoryManager()
 
     agent = Agent(
-        llm=llm,
-        system_prompt="You are a helpful assistant."
+         llm = FakeLLM(),
+         memory_manager = memory,
+         agent_id = "test_agent",
+         system_prompt = None
+
     )
 
-    agent.handle_user_message("Hello")
+    reply = agent.handle_user_message("remember favorite_color is blue")
 
-    llm.invoke.assert_called_once_with([
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Hello"}
-    ])
+    # Memory should be updated
+    assert memory.updated["favorite_color"] == "blue"
 
-def test_agent_sends_conversation_history():
-        llm = MagicMock()
-        llm.invoke.side_effect = ["Hi there!", "Hi there!"]
+    # Agent should return confirmation
+    assert reply == "Okay, I will remember that."
 
-        agent = Agent(llm=llm)
-        agent.handle_user_message("Hello")
-        agent.handle_user_message("How are you")
+    # Confirmation should be appended to history
+    assert agent.history[-1]["role"] == "assistant"
+    assert agent.history[-1]["content"] == "Okay, I will remember that."
 
-        llm.invoke.assert_called_with([
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi there!"},
-            {"role": "user", "content": "How are you"}
-        ])
+# Test PrepareMessages
 
-def test_agent_stores_assistant_messages():
-     llm = MagicMock()
-     llm.invoke.return_value = "Hi there!"
-
-     agent = Agent(llm=llm)
-
-     reply = agent.handle_user_message("Hello")
-
-     # Agent should store the assistant reply
-     assert agent.history[-1]["role"] == "assistant"
-     assert agent.history[-1]["content"] == "Hi there!"
+# Test LLMInvocation

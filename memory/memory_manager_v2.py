@@ -5,15 +5,15 @@ import uuid
 
 
 class MemoryManagerV2:
-    def __init__(self,path):
-        self.path = path
-        self.agent_id = os.path.splitext(os.path.basename(path))[0]
+    def __init__(self,agent_id):
+        self.agent_id = agent_id
+        self.path = os.path.join("memory/agents", f"{agent_id}.json")
 
         # Ensure the directory exists
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
 
         # Create file if missing
-        if not os.path.exists(path):
+        if not os.path.exists(self.path):
             self.initialize_file()
 
     def initialize_file(self):

@@ -1,98 +1,128 @@
 import re
 import uuid
+from enum import Enum
+
 from agents.agent_factory import AgentFactory
 from agents.agent_registry import AgentRegistry
 from memory.memory_manager_v2 import MemoryManagerV2
-from enum import Enum
+
 
 class ManagerMode(Enum):
-     MODERATED = "moderated"
-     PARTY_LINE = "party_line"
+    MODERATED = "moderated"
+    PARTY_LINE = "party_line"
+
 
 class ManagerAgent:
     def __init__(self, llm=None):
-        self.llm = llm
-        self.factory = AgentFactory()
-        self.registry = AgentRegistry()
+        self.llm = llm                      # Jarvis' own LLM (optional fallback)
+        self.factory = AgentFactory()       # Factory no longer owns an LLM
+        self.registry = AgentRegistry()     # Tracks all agents
         self.mode = ManagerMode.MODERATED
-        self.agent_id = str(uuid.uuid4())
-        self.active_agent_id = None
+        self.agent_id = str(uuid.uuid4())   # Jarvis' own ID
+        self.active_agent_id = None         # Who currently has control
 
+    # ----------------------------------------------------------------------
+    # AGENT CREATION
+    # ----------------------------------------------------------------------
     def spawn_agent(self, llm=None, name=None, system_prompt=None):
-            # 1 Create a new agent using the factory
-            agent = self.factory.create_agent()
+        """
+        Create a new agent with:
+        - its own UUID
+        - its own MemoryManagerV2
+        - an injected llm (or Jarvis' llm if none provided)
+        - optional name + system prompt stored in memory
+        """
 
-            # 2 If a name was provided, store it in the agent's memory
-            if name:
-                agent.memory_manager.update("agent_name", name)
+        agent_id = str(uuid.uuid4())
+        memory_manager = MemoryManagerV2(agent_id)
 
-            # 3 Register the agentso Jarvis can manager it
-            self.registry.add(agent)
+        # Decide which llm the agent gets
+        agent_llm = llm if llm is not None else self.llm
 
-            # 4 Return the agent instance
-            return agent
+        # Create agent through factory
+        agent = self.factory.create_agent(
+            llm=agent_llm,
+            memory_manager=memory_manager,
+            agent_id=agent_id,
+            system_prompt=system_prompt
+        )
 
+        # Optional: store agent name in memory
+        if name:
+            memory_manager.update("agent_name", name)
+
+        # Register agent so Jarvis can manage it
+        self.registry.add(agent)
+
+        return agent
+
+    # ----------------------------------------------------------------------
+    # RENAME AGENT
+    # ----------------------------------------------------------------------
     def rename_agent(self, agent_id, name=None):
-         # Check the registry for the agent id
-         agent = self.registry.get(agent_id)
-         # If no agent found with that agent id  return message
-         if agent is None:
-              return f"I can't find an agent with id: {agent_id}"
-        # check if a actual name was passed in if not return message
-         if name is None:
-              return "An actual name must be supplied to rename"
+        agent = self.registry.get(agent_id)
+        if agent is None:
+            return f"I can't find an agent with id: {agent_id}"
 
-        # Update the agent memory with new name
-         agent.memory_manager.update("agent_name", name)
-        # return the updated agent
-         return agent
+        if not name:
+            return "An actual name must be supplied to rename"
 
+        agent.memory_manager.update("agent_name", name)
+        return agent
+
+    # ----------------------------------------------------------------------
+    # SYSTEM PROMPT ASSIGNMENT
+    # ----------------------------------------------------------------------
     def assign_system_prompt(self, agent_id, prompt):
-         agent = self.registry.get(agent_id)
-         
-         if not agent:
-              return f"No agent found with id: {agent_id}"
-         if not prompt:
-              return "Must supply a prompt string"
-         data = agent.memory_manager.load()
-         data["personality"]["system_prompt"] = prompt
-         agent.memory_manager.update("personality", data["personality"])
+        agent = self.registry.get(agent_id)
 
+        if not agent:
+            return f"No agent found with id: {agent_id}"
+        if not prompt:
+            return "Must supply a prompt string"
+
+        data = agent.memory_manager.load()
+        personality = data.get("personality", {})
+        personality["system_prompt"] = prompt
+
+        agent.memory_manager.update("personality", personality)
+
+    # ----------------------------------------------------------------------
+    # MODE NORMALIZATION + SETTING
+    # ----------------------------------------------------------------------
     def normalize_mode(self, mode_str):
-         # Lowercase the input
-         ns = mode_str.lower()
-         # Replace ANY sequences of spaces, hyphens, or underscores with a single underscore
-         ns = re.sub(r"[\s\-_]+", "_", ns)
-         # Strip leading and trailing underscores
-         ns = ns.strip("_")
-         return ns
+        ns = mode_str.lower()
+        ns = re.sub(r"[\s\-_]+", "_", ns)
+        ns = ns.strip("_")
+        return ns
 
     def set_mode(self, mode_str):
-         # Normalize string input
-         mode = self.normalize_mode(mode_str)
-         try:
-              self.mode = ManagerMode(mode).value
-              return f"Mode set to {self.mode}"
-         except ValueError:
-             return  f" mode: {mode} not a valid mode"
+        mode = self.normalize_mode(mode_str)
+        try:
+            self.mode = ManagerMode(mode).value
+            return f"Mode set to {self.mode}"
+        except ValueError:
+            return f"mode: {mode} not a valid mode"
 
-    def  route_to_agent(self,agent_id, message_str):
-         agent = self.registry.get(agent_id)
-         if not agent:
-               return f"No agent found with id: {agent_id}"
-         if not message_str:
-              return "No message found"
-         reply = agent.handle_user_message(message_str)
-         if isinstance(reply, dict) and "content" in reply:
-              return reply["content"]
-         return reply
+    # ----------------------------------------------------------------------
+    # ROUTING
+    # ----------------------------------------------------------------------
+    def route_to_agent(self, agent_id, message_str):
+        agent = self.registry.get(agent_id)
+        if not agent:
+            return f"No agent found with id: {agent_id}"
+        if not message_str:
+            return "No message found"
 
+        reply = agent.handle_user_message(message_str)
+
+        if isinstance(reply, dict) and "content" in reply:
+            return reply["content"]
+
+        return reply
+
+    # ----------------------------------------------------------------------
+    # CONTROL RETURN
+    # ----------------------------------------------------------------------
     def return_control(self):
-         # We are doing on thing and one hting only here
-         # we are setting the value of the active_agent_id back to jarvis
-         self.active_agent_id = None
-              
-
-
-
-         
+        self.active_agent_id = None

@@ -1,0 +1,9 @@
+{
+    "agent_id": "5d80f656-117b-4ea6-bce8-c8ab4b5a9f08",
+    "agent_name": null,
+    "user_name": null,
+    "personality": {
+        "system_prompt": "You are a friendly research assistant."
+    },
+    "facts": {}
+}
