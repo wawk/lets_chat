@@ -51,12 +51,22 @@ class Agent:
         messages = self._prepare_messages(text)
 
         # NORMAL LLM FLOW
-        reply = self.llm.invoke(messages)
+        if hasattr(self.llm, "invoke"):
+            # FakeLLM or custom LLM wrapper
+            reply = self.llm.invoke(messages)
+            reply_text = reply["content"] if isinstance(reply, dict) else reply
+        else:
+            # Real OpenAI client
+            response = self.llm.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages
+            )
+            reply_text = response.choices[0].message.content
 
-        # Save assistant reply
+        # Save assistant reply (string only)
         self.history.append({
             "role": "assistant",
-            "content": reply
+            "content": reply_text
         })
 
-        return reply
+        return reply_text

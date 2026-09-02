@@ -31,6 +31,7 @@ Thumbs.db
 # Agent memory files
 memory/*.json
 agents/*.json
+memory/agents/*.json
 
 
 

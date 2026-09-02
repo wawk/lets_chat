@@ -1,0 +1,9 @@
+{
+    "agent_id": "memory/agents/a1910f73c3c447aea10e03b0d0cfa8a1.json",
+    "agent_name": "Bob",
+    "user_name": "Steve",
+    "personality": {},
+    "facts": {
+        "favorite_color": "blue"
+    }
+}

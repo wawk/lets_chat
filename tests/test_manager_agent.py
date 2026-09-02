@@ -1,61 +1,78 @@
-import pytest
-from agents.agent_factory import AgentFactory
-from agents.agent_registry import AgentRegistry
+import uuid
 from agents.manager_agent import ManagerAgent
+from agents.agent import Agent
 
-def test_jarvis_can_spawn_agent():
-    jarvis = ManagerAgent()
-    agent = jarvis.spawn_agent()
+class FakeLLM:
+    def __init__(self):
+        self.last_messages = None
 
-    assert agent.agent_id is not None
-    assert jarvis.registry.get(agent.agent_id) is agent
+    def invoke(self, messages):
+        self.last_messages = messages
+        return {"content": "LLM reply"}
 
-def test_jarvis_can_spawn_agent_with_name():
-    jarvis = ManagerAgent()
-    agent = jarvis.spawn_agent(name = "Rachel")
+def test_manager_agent_spawns_agents_with_uuid():
+    llm = FakeLLM()
+    manager = ManagerAgent(llm=llm)
 
-    data = agent.memory_manager.load()
-    assert data["agent_name"] == "Rachel"
+    agent = manager.spawn_agent(system_prompt="You are helpful")
 
-def test_jarvis_can_rename_agent():
-    jarvis = ManagerAgent()
-    agent = jarvis.spawn_agent(name = "Alpha")
-    jarvis.rename_agent(agent.agent_id, "Nova")
-    data = agent.memory_manager.load()
+    assert isinstance(agent, Agent)
+    assert agent.agent_id in manager.agents
+    assert len(agent.agent_id) == 32  # UUID hex
+    assert agent.system_prompt == "You are helpful"
 
-    assert data["agent_name"] == "Nova"
+def test_manager_agent_injects_memory_manager_v2():
+    llm = FakeLLM()
+    manager = ManagerAgent(llm=llm)
 
-def test_jarvis_can_assign_system_prompt():
-    jarvis = ManagerAgent()
-    agent = jarvis.spawn_agent()
+    agent = manager.spawn_agent(system_prompt="test")
 
-    prompt = "You are a friendly research assistant."
-    jarvis.assign_system_prompt(agent.agent_id, prompt)
+    # MemoryManagerV2 should exist and be bound to this agent
+    assert agent.memory_manager is not None
+    assert agent.memory_manager.agent_id == agent.agent_id
 
-    data = agent.memory_manager.load()
-    assert data["personality"]["system_prompt"] == prompt
+def test_manager_agent_routes_messages_to_agent():
+    llm = FakeLLM()
+    manager = ManagerAgent(llm=llm)
 
-def test_jarvis_can_switch_modes():
-    jarvis = ManagerAgent()
+    agent = manager.spawn_agent(system_prompt="test")
 
-    jarvis.set_mode("party_line")
-    assert jarvis.mode == "party_line"
+    reply = manager.handle_message(agent.agent_id, "Hello agent")
 
-    jarvis.set_mode("moderated")
-    assert jarvis.mode == "moderated"
+    assert reply == "LLM reply"
+    assert llm.last_messages is not None
+    assert llm.last_messages[-1]["content"] == "Hello agent"
 
-def test_jarvis_can_route_messages_to_agent():
-    class FakeLLM:
-        def invoke(self, messages):
-            return {"content": "Hello from agent"}
-    jarvis = ManagerAgent(llm=FakeLLM())
-    agent = jarvis.spawn_agent(name="Echo")
+def test_manager_agent_tracks_multiple_agents():
+    llm = FakeLLM()
+    manager = ManagerAgent(llm=llm)
 
-    response = jarvis.route_to_agent(agent.agent_id, "Hello Echo")
-    assert response == "Hello from agent"
+    a1 = manager.spawn_agent(system_prompt="A1")
+    a2 = manager.spawn_agent(system_prompt="A2")
 
-def test_jarvis_returns_control_to_self():
-    jarvis = ManagerAgent()
-    jarvis.active_agent_id = "some-agent"
-    jarvis.return_control()
-    assert jarvis.active_agent_id is None
+    assert a1.agent_id in manager.agents
+    assert a2.agent_id in manager.agents
+    assert a1.agent_id != a2.agent_id
+
+def test_manager_agent_raises_for_unknown_agent():
+    llm = FakeLLM()
+    manager = ManagerAgent(llm=llm)
+
+    try:
+        manager.handle_message("unknown_id", "Hello")
+        assert False, "Expected KeyError for unknown agent"
+    except KeyError:
+        assert True
+
+def test_manager_agent_passes_system_prompt_to_agent():
+    llm = FakeLLM()
+    manager = ManagerAgent(llm=llm)
+
+    agent = manager.spawn_agent(system_prompt="You are a test agent.")
+
+    # Agent.prepare_messages should include system prompt first
+    manager.handle_message(agent.agent_id, "Ping")
+
+    system_msg = llm.last_messages[0]
+    assert system_msg["role"] == "system"
+    assert system_msg["content"] == "You are a test agent."

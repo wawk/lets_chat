@@ -1,71 +1,84 @@
 import os
-import uuid
 import json
-import pytest
+import shutil
 from memory.memory_manager_v2 import MemoryManagerV2
 
-TEST_DIR = "memory/agents"
+TEST_DIR = "test_memory"
 
-def test_memory_manager_creates_file_if_missing():
-    agent_id = uuid.uuid4().hex
-    path = f"{TEST_DIR}/{agent_id}.json"
+def setup_function():
+    # Clean test directory before each test
+    if os.path.exists(TEST_DIR):
+        shutil.rmtree(TEST_DIR)
+    os.makedirs(TEST_DIR, exist_ok=True)
 
-    # Ensure file does not exist
-    if os.path.exists(path):
-        os.remove(path)
-    mm = MemoryManagerV2(path)
+def test_load_memory_returns_empty_when_file_missing():
+    mm = MemoryManagerV2(agent_id="agent123", base_dir=TEST_DIR)
 
-    assert os.path.exists(path), "MemoryManagerV2 should create the file if missing"
+    memory = mm.load_memory()
 
-def test_memory_manager_loads_empty_structure_initially():
-    agent_id = uuid.uuid4().hex
-    path = f"{TEST_DIR}/{agent_id}.json"
-    if os.path.exists(path):
-        os.remove(path)
-    mm = MemoryManagerV2(path)
-    data = mm.load()
+    assert memory == {}
+    assert os.path.exists(os.path.join(TEST_DIR, "agents"))
 
-    assert isinstance(data, dict)
-    assert data["agent_id"] == agent_id
-    assert data["facts"] == {}
-    assert data["personality"] == {}
-    assert data["user_name"] is None
-    assert data["agent_name"] is None
+def test_save_memory_creates_file():
+    mm = MemoryManagerV2(agent_id="agent123", base_dir=TEST_DIR)
 
-def test_memory_manager_saves_and_loads_updates():
-    agent_id = uuid.uuid4().hex
-    path = f"{TEST_DIR}/{agent_id}.json"
+    mm.save_memory({"foo": "bar"})
 
-    if os.path.exists(path):
-        os.remove(path)
-    mm = MemoryManagerV2(path)
+    path = os.path.join(TEST_DIR, "agents", "agent123.json")
+    assert os.path.exists(path)
 
-    mm.update("agent_name", "Bob")
-    mm.update("user_name", "Steve")
+    with open(path, "r") as f:
+        data = json.load(f)
+
+    assert data["foo"] == "bar"
+
+def test_update_facts_persists_changes():
+    mm = MemoryManagerV2(agent_id="agent123", base_dir=TEST_DIR)
+
     mm.update_facts("favorite_color", "blue")
 
-    data = mm.load()
+    path = os.path.join(TEST_DIR, "agents", "agent123.json")
+    with open(path, "r") as f:
+        data = json.load(f)
 
+    assert data["favorite_color"] == "blue"
 
-    assert data["agent_name"] == "Bob"
-    assert data["user_name"] == "Steve"
-    assert data["facts"]["favorite_color"] == "blue"
+def test_update_facts_merges_existing_memory():
+    mm = MemoryManagerV2(agent_id="agent123", base_dir=TEST_DIR)
 
-    def test_memory_manager_persists_across_instances():
+    mm.save_memory({"favorite_color": "blue"})
+    mm.update_facts("pet", "dog")
 
-        agent_id = uuid.uuid4().hex
-        path = f"{TEST_DIR}/ {agent_id}.json"
+    memory = mm.load_memory()
 
-        if os.path.exists(path):
-            os.remove(path)
-        mm1 = MemoryManagerV2(path)
-        mm1.update("agent_name", "Eve")
-        mm1.update("mood", "curious")
+    assert memory["favorite_color"] == "blue"
+    assert memory["pet"] == "dog"
 
-        mm2 = MemoryManagerV2(path)
-        data = mm2.load()
+def test_parse_memory_instruction_basic():
+    mm = MemoryManagerV2(agent_id="agent123", base_dir=TEST_DIR)
 
-        assert data["agent_name"] == "Eve"
-        assert data["facts"]["mood"] == "curious"
+    key, value = mm.parse_memory_instruction("remember favorite_color is blue")
 
+    assert key == "favorite_color"
+    assert value == "blue"
 
+def test_parse_memory_instruction_invalid():
+    mm = MemoryManagerV2(agent_id="agent123", base_dir=TEST_DIR)
+
+    key, value = mm.parse_memory_instruction("do not remember anything")
+
+    assert key is None
+    assert value is None
+
+def test_atomic_write_creates_valid_json():
+    mm = MemoryManagerV2(agent_id="agent123", base_dir=TEST_DIR)
+
+    mm.save_memory({"x": 1})
+
+    path = os.path.join(TEST_DIR, "agents", "agent123.json")
+
+    # File must contain valid JSON even if atomic write used temp file
+    with open(path, "r") as f:
+        data = json.load(f)
+
+    assert data["x"] == 1
